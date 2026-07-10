@@ -1,0 +1,51 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Laravel generated files
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/bootstrap/cache/*
+
+# Frontend builds
+/public/build/
+/public/hot
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Credentials and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account.json
+
+# Terraform state and sensitive files
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl.backup
+
+# Logs
+*.log
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.zip
