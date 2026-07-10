@@ -1,0 +1,1 @@
+# aws-iot-temperature-monitoring
