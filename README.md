@@ -1,8 +1,14 @@
 # AWS IoT Temperature Monitoring Platform
 
-Production-ready IoT platform built on AWS for real-time temperature monitoring using LoRaWAN sensors.
+> Production-ready IoT platform built on AWS for real-time temperature monitoring using LoRaWAN sensors.
 
-![Architecture](docs/architecture/aws-architecture.png)
+![AWS](https://img.shields.io/badge/AWS-IoT_Core-orange)
+![Lambda](https://img.shields.io/badge/AWS-Lambda-orange)
+![DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-blue)
+![Laravel](https://img.shields.io/badge/Laravel-Framework-red)
+![LoRaWAN](https://img.shields.io/badge/LoRaWAN-Milesight-green)
+
+End-to-end IoT platform designed for industrial temperature monitoring, real-time alerts and historical analytics.
 
 ## Overview
 
