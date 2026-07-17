@@ -63,7 +63,7 @@ The architecture was designed to be scalable and easily extensible to additional
 
 ### Main Dashboard
 
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](docs/screenshots/Dashboard.png)
 
 ---
 
