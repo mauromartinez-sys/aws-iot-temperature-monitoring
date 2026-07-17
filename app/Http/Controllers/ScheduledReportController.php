@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ScheduledReport;
+use App\Models\IotSensor;
 use Illuminate\Http\Request;
 
 class ScheduledReportController extends Controller
@@ -23,9 +24,27 @@ class ScheduledReportController extends Controller
             ->values()
             ->toArray();
 
+        $activeSensorKeys = IotSensor::query()
+            ->where('is_active', true)
+            ->pluck('sensor_key')
+            ->map(fn ($sensorKey) => (string) $sensorKey)
+            ->all();
+
+        $cameraIds = collect($request->camera_ids)
+            ->map(fn ($sensorKey) => (string) $sensorKey)
+            ->filter(fn ($sensorKey) => in_array($sensorKey, $activeSensorKeys, true))
+            ->values()
+            ->all();
+
+        if (empty($cameraIds)) {
+            return back()
+                ->withErrors(['camera_ids' => 'Seleccioná al menos una cámara activa.'])
+                ->withInput();
+        }
+
         ScheduledReport::create([
             'name' => $request->name,
-            'camera_ids' => array_values($request->camera_ids),
+            'camera_ids' => $cameraIds,
             'frequency' => $request->frequency,
             'send_pdf' => $request->has('send_pdf'),
             'send_excel' => $request->has('send_excel'),

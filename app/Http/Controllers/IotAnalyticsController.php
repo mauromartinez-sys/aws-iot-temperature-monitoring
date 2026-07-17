@@ -24,38 +24,36 @@ class IotAnalyticsController extends Controller
 
     private function sensorCatalog(): array
     {
-        $nameMap = IotSensor::displayNameMap();
-        $settings = IotSensor::settingsMap();
+        $sensors = IotSensor::query()
+            ->where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('sensor_key')
+            ->get();
 
-        return [
-            'sensor_demo_001' => [
-                'sensor_id' => 'sensor_demo_001',
-                'camera_key' => 'camara_1',
-                'camera_id' => IotSensor::displayNameFor('camara_1', $nameMap),
-                'location' => $settings['camara_1']['location'] ?? 'Planta Demo',
-                'description' => $settings['camara_1']['description'] ?? 'Cámara de conservación general',
-                'alarm_min' => $settings['camara_1']['alarm_min'] ?? null,
-                'alarm_max' => $settings['camara_1']['alarm_max'] ?? null,
-            ],
-            'sensor_demo_002' => [
-                'sensor_id' => 'sensor_demo_002',
-                'camera_key' => 'camara_2',
-                'camera_id' => IotSensor::displayNameFor('camara_2', $nameMap),
-                'location' => $settings['camara_2']['location'] ?? 'Planta Demo',
-                'description' => $settings['camara_2']['description'] ?? 'Cámara de tránsito / operación frecuente',
-                'alarm_min' => $settings['camara_2']['alarm_min'] ?? null,
-                'alarm_max' => $settings['camara_2']['alarm_max'] ?? null,
-            ],
-            'sensor_demo_003' => [
-                'sensor_id' => 'sensor_demo_003',
-                'camera_key' => 'camara_3',
-                'camera_id' => IotSensor::displayNameFor('camara_3', $nameMap),
-                'location' => $settings['camara_3']['location'] ?? 'Planta Demo',
-                'description' => $settings['camara_3']['description'] ?? 'Cámara crítica / alta sensibilidad',
-                'alarm_min' => $settings['camara_3']['alarm_min'] ?? null,
-                'alarm_max' => $settings['camara_3']['alarm_max'] ?? null,
-            ],
-        ];
+        if ($sensors->isEmpty()) {
+            return [];
+        }
+
+        return $sensors
+            ->mapWithKeys(function (IotSensor $sensor) {
+                $sensorKey = (string) $sensor->sensor_key;
+
+                return [
+                    $sensorKey => [
+                        'sensor_id' => $sensorKey,
+                        'camera_key' => $sensorKey,
+                        'camera_id' => $sensor->display_name ?: $sensorKey,
+                        'display_name' => $sensor->display_name ?: $sensorKey,
+                        'location' => $sensor->location ?: 'Sin ubicación asignada',
+                        'description' => $sensor->description ?: ($sensor->type ?: 'Punto de medición IoT'),
+                        'alarm_min' => $sensor->alarm_min,
+                        'alarm_max' => $sensor->alarm_max,
+                        'type' => $sensor->type,
+                        'display_order' => $sensor->display_order,
+                    ],
+                ];
+            })
+            ->toArray();
     }
 
     private function resolveFilters(Request $request): array
@@ -188,6 +186,15 @@ class IotAnalyticsController extends Controller
             'summary' => $summary,
             'chart' => $chart,
             'errors' => $errors,
+            'reportSensors' => IotSensor::query()
+                ->where('is_active', true)
+                ->orderBy('display_order')
+                ->orderBy('sensor_key')
+                ->get(),
+            'reportCameraNameMap' => IotSensor::query()
+                ->where('is_active', true)
+                ->pluck('display_name', 'sensor_key')
+                ->toArray(),
         ];
     }
 

@@ -1186,7 +1186,7 @@
                             </div>
                             <div class="metric-box">
                                 <div class="label">Última señal</div>
-                                <div class="value" id="metricMinutes">{{ $firstPoint['minutes_ago_label'] ?? '—' }}</div>
+                                <div class="value" id="metricMinutes" title="{{ $firstPoint['last_seen_at_label'] ?? '—' }}">{{ $firstPoint['minutes_ago_label'] ?? '—' }}</div>
                             </div>
                             <div class="metric-box">
                                 <div class="label">Sensor ID</div>
@@ -1395,8 +1395,12 @@
         const value = Number(minutes);
         if (Number.isNaN(value)) return '—';
 
+        if (value < 1) {
+            return '1 min';
+        }
+
         if (value < 60) {
-            return `${Math.max(1, Math.round(value))} min`;
+            return `${Math.max(1, Math.floor(value))} min`;
         }
 
         if (value < 1440) {
@@ -1635,7 +1639,9 @@
         document.getElementById('metricBattery').textContent = point.battery !== null ? `${point.battery}%` : '—';
         document.getElementById('metricRssi').textContent = point.signal_rssi !== null ? `${point.signal_rssi} dBm` : '—';
         document.getElementById('metricSnr').textContent = point.signal_snr !== null ? `${point.signal_snr} dB` : '—';
-        document.getElementById('metricMinutes').textContent = formatElapsedMinutes(point.minutes_ago);
+        const metricMinutes = document.getElementById('metricMinutes');
+        metricMinutes.textContent = point.minutes_ago_label || formatElapsedMinutes(point.minutes_ago);
+        metricMinutes.title = point.last_seen_at_label || '—';
         document.getElementById('metricSensorId').textContent = point.sensor_id;
 
         document.getElementById('healthScore').textContent = `${point.health_score}%`;

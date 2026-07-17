@@ -11,27 +11,51 @@ use Carbon\Carbon;
 class IotDashboardController extends Controller
 {
 
-    private function formatElapsedMinutes($minutes): string
+
+    private function formatLastActivity(?string $timestamp): array
     {
-        if ($minutes === null || $minutes === '') {
-            return '—';
+        if (!$timestamp) {
+            return [
+                'minutes' => null,
+                'label' => '—',
+                'datetime_label' => '—',
+            ];
         }
 
-        $minutes = (float) $minutes;
+        try {
+            $appTimezone = config('app.timezone', 'America/Argentina/Buenos_Aires');
+            $lastSeen = Carbon::parse($timestamp)->timezone($appTimezone);
+            $now = now($appTimezone);
+            $secondsAgo = max(0, $lastSeen->diffInSeconds($now));
 
-        if ($minutes < 60) {
-            $roundedMinutes = max(1, (int) round($minutes));
-            return $roundedMinutes . ' min';
+            if ($secondsAgo < 60) {
+                $label = '1 min';
+            } elseif ($secondsAgo < 3600) {
+                $minutes = max(1, (int) floor($secondsAgo / 60));
+                $label = $minutes . ' min';
+            } elseif ($secondsAgo < 86400) {
+                $hours = max(1, (int) floor($secondsAgo / 3600));
+                $label = $hours . ' h';
+            } else {
+                $days = max(1, (int) floor($secondsAgo / 86400));
+                $label = $days . ' ' . ($days === 1 ? 'día' : 'días');
+            }
+
+            return [
+                'minutes' => round($secondsAgo / 60, 2),
+                'label' => $label,
+                'datetime_label' => $lastSeen->format('d/m/Y H:i:s'),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'minutes' => null,
+                'label' => '—',
+                'datetime_label' => '—',
+            ];
         }
-
-        if ($minutes < 1440) {
-            $hours = max(1, (int) floor($minutes / 60));
-            return $hours . ' h';
-        }
-
-        $days = max(1, (int) floor($minutes / 1440));
-        return $days . ' ' . ($days === 1 ? 'día' : 'días');
     }
+
+
 
     private function getSensorData()
     {
@@ -41,36 +65,36 @@ class IotDashboardController extends Controller
         ]);
 
         $marshaler = new Marshaler();
-        $sensorNameMap = IotSensor::displayNameMap();
-        $sensorSettings = IotSensor::settingsMap();
 
-        // Mantengo el sensor_id técnico de DynamoDB y separo el camera_key visible/configurable.
-        $sensors = [
-            [
-                'sensor_id' => 'sensor_demo_001',
-                'camera_key' => 'camara_1',
-                'name' => IotSensor::displayNameFor('camara_1', $sensorNameMap),
-                'location' => $sensorSettings['camara_1']['location'] ?? 'Planta Demo',
-                'alarm_min' => $sensorSettings['camara_1']['alarm_min'] ?? null,
-                'alarm_max' => $sensorSettings['camara_1']['alarm_max'] ?? null,
-            ],
-            [
-                'sensor_id' => 'sensor_demo_002',
-                'camera_key' => 'camara_2',
-                'name' => IotSensor::displayNameFor('camara_2', $sensorNameMap),
-                'location' => $sensorSettings['camara_2']['location'] ?? 'Planta Demo',
-                'alarm_min' => $sensorSettings['camara_2']['alarm_min'] ?? null,
-                'alarm_max' => $sensorSettings['camara_2']['alarm_max'] ?? null,
-            ],
-            [
-                'sensor_id' => 'sensor_demo_003',
-                'camera_key' => 'camara_3',
-                'name' => IotSensor::displayNameFor('camara_3', $sensorNameMap),
-                'location' => $sensorSettings['camara_3']['location'] ?? 'Planta Demo',
-                'alarm_min' => $sensorSettings['camara_3']['alarm_min'] ?? null,
-                'alarm_max' => $sensorSettings['camara_3']['alarm_max'] ?? null,
-            ],
-        ];
+        // Fuente única de verdad: los sensores visibles del dashboard salen del panel de Configuración.
+        // Si un sensor se desactiva, cambia de orden o se agrega uno real, el dashboard lo refleja.
+        $sensorNameMap = IotSensor::displayNameMap(true);
+        $sensorSettings = IotSensor::settingsMap(true);
+
+        $sensors = IotSensor::query()
+            ->where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('sensor_key')
+            ->get()
+            ->map(function (IotSensor $sensor) {
+                $description = $sensor->description
+                    ?: ($sensor->camera_type ?: 'Cámara frigorífica monitoreada');
+
+                return [
+                    'sensor_id' => $sensor->sensor_key,
+                    'camera_key' => $sensor->sensor_key,
+                    'name' => $sensor->display_name ?: $sensor->sensor_key,
+                    'display_name' => $sensor->display_name ?: $sensor->sensor_key,
+                    'location' => $sensor->location ?: 'Sin ubicación asignada',
+                    'description' => $description,
+                    'camera_type' => $sensor->camera_type,
+                    'alarm_min' => $sensor->alarm_min !== null ? (float) $sensor->alarm_min : null,
+                    'alarm_max' => $sensor->alarm_max !== null ? (float) $sensor->alarm_max : null,
+                    'display_order' => (int) $sensor->display_order,
+                ];
+            })
+            ->values()
+            ->all();
 
         $readings = [];
         $chartData = [];
@@ -104,6 +128,7 @@ class IotDashboardController extends Controller
                     'sensor_id' => $sensorId,
                     'camera_key' => $sensor['camera_key'],
                     'camera_id' => $sensor['name'],
+                    'display_name' => $sensor['display_name'] ?? $sensor['name'],
                     'location' => $sensor['location'],
                     'temperature' => null,
                     'humidity' => null,
@@ -116,6 +141,9 @@ class IotDashboardController extends Controller
                     'status_class' => 'offline',
                     'status_icon' => '●',
                     'status_message' => 'Sin lecturas recientes',
+                    'minutes_ago' => null,
+                    'minutes_ago_label' => '—',
+                    'last_seen_at_label' => '—',
                 ];
 
                 $chartData[$sensorId] = [
@@ -136,9 +164,11 @@ class IotDashboardController extends Controller
             $doorOpen = !empty($latest['door_open']);
             $lastSeen = $latest['timestamp'] ?? null;
 
-            $cameraKey = $latest['camera_id'] ?? $sensor['camera_key'];
+            $cameraKey = $sensor['camera_key'];
+            $latest['sensor_id'] = $sensorId;
             $latest['camera_key'] = $cameraKey;
-            $latest['camera_id'] = IotSensor::displayNameFor($cameraKey, $sensorNameMap);
+            $latest['camera_id'] = $sensor['name'];
+            $latest['display_name'] = $sensor['display_name'] ?? $sensor['name'];
             $latest['location'] = $sensor['location'];
             $latest['temperature'] = $temperature;
             $latest['humidity'] = $humidity;
@@ -192,24 +222,22 @@ class IotDashboardController extends Controller
             }
 
             if ($lastSeen) {
-                try {
-                    $minutesAgo = Carbon::parse($lastSeen)->diffInMinutes(now());
-                    $latest['minutes_ago'] = $minutesAgo;
-                    $latest['minutes_ago_label'] = $this->formatElapsedMinutes($minutesAgo);
+                $lastActivity = $this->formatLastActivity($lastSeen);
+                $minutesAgo = $lastActivity['minutes'];
+                $latest['minutes_ago'] = $minutesAgo;
+                $latest['minutes_ago_label'] = $lastActivity['label'];
+                $latest['last_seen_at_label'] = $lastActivity['datetime_label'];
 
-                    if ($minutesAgo > 30) {
-                        $latest['status'] = 'SIN SEÑAL';
-                        $latest['status_class'] = 'offline';
-                        $latest['status_icon'] = '●';
-                        $latest['status_message'] = 'El sensor no reporta hace más de 30 minutos';
-                    }
-                } catch (\Exception $e) {
-                    $latest['minutes_ago'] = null;
-                    $latest['minutes_ago_label'] = '—';
+                if ($minutesAgo !== null && $minutesAgo > 30) {
+                    $latest['status'] = 'SIN SEÑAL';
+                    $latest['status_class'] = 'offline';
+                    $latest['status_icon'] = '●';
+                    $latest['status_message'] = 'El sensor no reporta hace más de 30 minutos';
                 }
             } else {
                 $latest['minutes_ago'] = null;
                 $latest['minutes_ago_label'] = '—';
+                $latest['last_seen_at_label'] = '—';
             }
 
             if ($latest['status_class'] !== 'success') {

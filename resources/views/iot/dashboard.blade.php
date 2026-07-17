@@ -804,7 +804,7 @@
                     <div class="mini-metric">
                         <div class="m-label">Última señal</div>
                         <div class="m-value">
-                            {{ $reading['minutes_ago_label'] ?? '—' }}
+                            <span title="{{ $reading['last_seen_at_label'] ?? '—' }}">{{ $reading['minutes_ago_label'] ?? '—' }}</span>
                         </div>
                     </div>
                 </div>

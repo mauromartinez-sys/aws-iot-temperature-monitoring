@@ -12,86 +12,82 @@ use App\Models\IotAlarmEvent;
 class IotPointsController extends Controller
 {
 
-    private function formatElapsedMinutes($minutes): string
+
+    private function formatLastActivity(?string $timestamp): array
     {
-        if ($minutes === null || $minutes === '') {
-            return '—';
+        if (!$timestamp) {
+            return [
+                'minutes' => null,
+                'label' => '—',
+                'datetime_label' => '—',
+            ];
         }
 
-        $minutes = (float) $minutes;
+        try {
+            $appTimezone = config('app.timezone', 'America/Argentina/Buenos_Aires');
+            $lastSeen = Carbon::parse($timestamp)->timezone($appTimezone);
+            $now = now($appTimezone);
+            $secondsAgo = max(0, $lastSeen->diffInSeconds($now));
 
-        if ($minutes < 60) {
-            $roundedMinutes = max(1, (int) round($minutes));
-            return $roundedMinutes . ' min';
+            if ($secondsAgo < 60) {
+                $label = '1 min';
+            } elseif ($secondsAgo < 3600) {
+                $minutes = max(1, (int) floor($secondsAgo / 60));
+                $label = $minutes . ' min';
+            } elseif ($secondsAgo < 86400) {
+                $hours = max(1, (int) floor($secondsAgo / 3600));
+                $label = $hours . ' h';
+            } else {
+                $days = max(1, (int) floor($secondsAgo / 86400));
+                $label = $days . ' ' . ($days === 1 ? 'día' : 'días');
+            }
+
+            return [
+                'minutes' => round($secondsAgo / 60, 2),
+                'label' => $label,
+                'datetime_label' => $lastSeen->format('d/m/Y H:i:s'),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'minutes' => null,
+                'label' => '—',
+                'datetime_label' => '—',
+            ];
         }
-
-        if ($minutes < 1440) {
-            $hours = max(1, (int) floor($minutes / 60));
-            return $hours . ' h';
-        }
-
-        $days = max(1, (int) floor($minutes / 1440));
-        return $days . ' ' . ($days === 1 ? 'día' : 'días');
     }
+
+
 
     private function getSensors(): array
     {
-        $defaults = [
-            [
-                'sensor_id' => 'sensor_demo_001',
-                'fallback_key' => 'camara_1',
-                'camera_id' => 'Cámara 1',
-                'location' => 'Planta Demo',
-                'description' => 'Cámara de conservación general',
-            ],
-            [
-                'sensor_id' => 'sensor_demo_002',
-                'fallback_key' => 'camara_2',
-                'camera_id' => 'Cámara 2',
-                'location' => 'Planta Demo',
-                'description' => 'Cámara de tránsito / operación frecuente',
-            ],
-            [
-                'sensor_id' => 'sensor_demo_003',
-                'fallback_key' => 'camara_3',
-                'camera_id' => 'Cámara 3',
-                'location' => 'Planta Demo',
-                'description' => 'Cámara crítica / alta sensibilidad',
-            ],
-        ];
+        // Fuente única de verdad: puntos de medición visibles desde Configuración.
+        // El panel ya no usa sensor_demo_001/002/003 fijos.
+        return IotSensor::query()
+            ->where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('sensor_key')
+            ->get()
+            ->map(function (IotSensor $sensor) {
+                $description = $sensor->description
+                    ?: ($sensor->camera_type ?: 'Cámara frigorífica monitoreada');
 
-        try {
-            $settings = IotSensor::settingsMap(false);
-        } catch (\Throwable $e) {
-            $settings = [];
-        }
-
-        return array_map(function (array $sensor) use ($settings) {
-            $setting = $settings[$sensor['sensor_id']]
-                ?? $settings[$sensor['fallback_key']]
-                ?? null;
-
-            if ($setting) {
-                $sensor['settings_key'] = $setting['sensor_key'] ?? $sensor['sensor_id'];
-                $sensor['display_name'] = $setting['display_name'] ?: $sensor['camera_id'];
-                $sensor['camera_id'] = $sensor['display_name'];
-                $sensor['location'] = $setting['location'] ?: $sensor['location'];
-                $sensor['description'] = $setting['description'] ?: ($setting['camera_type'] ?: $sensor['description']);
-                $sensor['alarm_min'] = $setting['alarm_min'] ?? null;
-                $sensor['alarm_max'] = $setting['alarm_max'] ?? null;
-                $sensor['is_active'] = $setting['is_active'] ?? true;
-                $sensor['display_order'] = $setting['display_order'] ?? 0;
-            } else {
-                $sensor['settings_key'] = $sensor['sensor_id'];
-                $sensor['display_name'] = $sensor['camera_id'];
-                $sensor['alarm_min'] = null;
-                $sensor['alarm_max'] = null;
-                $sensor['is_active'] = true;
-                $sensor['display_order'] = 0;
-            }
-
-            return $sensor;
-        }, $defaults);
+                return [
+                    'sensor_id' => $sensor->sensor_key,
+                    'fallback_key' => $sensor->sensor_key,
+                    'settings_key' => $sensor->sensor_key,
+                    'camera_id' => $sensor->display_name ?: $sensor->sensor_key,
+                    'display_name' => $sensor->display_name ?: $sensor->sensor_key,
+                    'location' => $sensor->location ?: 'Sin ubicación asignada',
+                    'description' => $description,
+                    'camera_type' => $sensor->camera_type,
+                    'alarm_min' => $sensor->alarm_min !== null ? (float) $sensor->alarm_min : null,
+                    'alarm_max' => $sensor->alarm_max !== null ? (float) $sensor->alarm_max : null,
+                    'is_active' => (bool) $sensor->is_active,
+                    'display_order' => (int) $sensor->display_order,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function getOperationalEvents(string $sensorId, ?string $settingsKey = null, ?string $fallbackKey = null): array
@@ -443,7 +439,7 @@ class IotPointsController extends Controller
 
         // Última comunicación
         $commStatus = 'good';
-        $commText = $minutesAgo !== null ? $this->formatElapsedMinutes($minutesAgo) : 'Sin dato';
+        $commText = $latest['minutes_ago_label'] ?? ($minutesAgo !== null ? $minutesAgo . ' min' : 'Sin dato');
 
         if ($minutesAgo !== null && $minutesAgo > 30) {
             $score -= 30;
@@ -527,6 +523,7 @@ class IotPointsController extends Controller
                     'timestamp' => null,
                     'minutes_ago' => null,
                     'minutes_ago_label' => '—',
+                    'last_seen_at_label' => '—',
                     'status_label' => 'SIN DATOS',
                     'status_class' => 'offline',
                     'status_message' => 'No se encontraron lecturas para este punto',
@@ -566,16 +563,10 @@ class IotPointsController extends Controller
             $snr = isset($latest['signal_snr']) ? (float) $latest['signal_snr'] : null;
             $timestamp = $latest['timestamp'] ?? null;
 
-            $minutesAgo = null;
-            if ($timestamp) {
-                try {
-                    $minutesAgo = Carbon::parse($timestamp)->diffInMinutes(now());
-                } catch (\Exception $e) {
-                    $minutesAgo = null;
-                }
-            }
-
-            $minutesAgoLabel = $minutesAgo !== null ? $this->formatElapsedMinutes($minutesAgo) : '—';
+            $lastActivity = $this->formatLastActivity($timestamp);
+            $minutesAgo = $lastActivity['minutes'];
+            $minutesAgoLabel = $lastActivity['label'];
+            $lastSeenAtLabel = $lastActivity['datetime_label'];
 
             $latestNormalized = [
                 'temperature' => $temperature,
@@ -587,6 +578,7 @@ class IotPointsController extends Controller
                 'timestamp' => $timestamp,
                 'minutes_ago' => $minutesAgo,
                 'minutes_ago_label' => $minutesAgoLabel,
+                'last_seen_at_label' => $lastSeenAtLabel,
             ];
 
             $status = $this->getReadingStatus($latestNormalized);
@@ -636,6 +628,7 @@ class IotPointsController extends Controller
                 'timestamp' => $timestamp,
                 'minutes_ago' => $minutesAgo,
                 'minutes_ago_label' => $minutesAgoLabel,
+                'last_seen_at_label' => $lastSeenAtLabel,
                 'status_label' => $status['label'],
                 'status_class' => $status['class'],
                 'status_message' => $status['message'],
