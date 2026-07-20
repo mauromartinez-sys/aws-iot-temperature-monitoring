@@ -3,7 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Análisis de Informes IoT</title>
+    
+    <link rel="icon" type="image/png" href="{{ asset('images/logo-iot.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logo-iot.png') }}">
+<title>Análisis de Informes IoT</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700,800" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -931,6 +934,25 @@
             display: none !important;
         }
 
+    
+
+        /* Logo IoT personalizado */
+        .brand-mark,
+        .brand-icon {
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: hidden;
+            padding: 0;
+        }
+        .brand-mark img,
+        .brand-icon img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
     </style>
 </head>
 <body>
@@ -953,9 +975,7 @@
 <div class="page">
     <div class="topbar">
         <div class="brand">
-            <div class="brand-icon">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M4 17V7l8-4 8 4v10l-8 4-8-4Z" stroke="white" stroke-width="1.8"/><path d="M8 13.5l2.2-2.2 2.1 2.1 3.9-4" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
+            <div class="brand-icon"><img src="{{ asset('images/logo-iot.png') }}" alt="Logo IoT"></div>
             <div>
                 <div class="eyebrow">IoT Analytics</div>
                 <h1>Análisis de Informes</h1>
@@ -1499,6 +1519,47 @@
 
     const chartPayload = aggregateChartByMinute(chartPayloadRaw);
 
+    function calculateTemperatureAxis(payload) {
+        const values = [];
+
+        (payload.datasets || []).forEach(dataset => {
+            (dataset.data || []).forEach(value => {
+                const numericValue = Number(value);
+                if (Number.isFinite(numericValue)) {
+                    values.push(numericValue);
+                }
+            });
+        });
+
+        if (!values.length) {
+            return { min: -2, max: 25 };
+        }
+
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const spread = Math.max(2, maxValue - minValue);
+        const padding = Math.max(2, Math.ceil(spread * 0.15));
+
+        let min = Math.floor(minValue - padding);
+        let max = Math.ceil(maxValue + padding);
+
+        if (min === max) {
+            min -= 2;
+            max += 2;
+        }
+
+        min = Math.floor(min / 5) * 5;
+        max = Math.ceil(max / 5) * 5;
+
+        if (minValue >= 0 && min < 0) {
+            min = 0;
+        }
+
+        return { min, max };
+    }
+
+    const temperatureAxis = calculateTemperatureAxis(chartPayload);
+
     const palette = ['#22d3ee', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'];
     chartPayload.datasets = chartPayload.datasets.map((dataset, index) => ({
         ...dataset,
@@ -1540,8 +1601,8 @@
                     grid: { color: 'rgba(148,163,184,.08)' }
                 },
                 y: {
-                    min: 15,
-                    max: 25,
+                    min: temperatureAxis.min,
+                    max: temperatureAxis.max,
                     ticks: { color: '#94a3b8', callback: value => value + '°C' },
                     grid: { color: 'rgba(148,163,184,.10)' }
                 }

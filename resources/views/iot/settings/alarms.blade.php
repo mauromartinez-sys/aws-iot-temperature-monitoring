@@ -5,7 +5,10 @@
     <title>Alertas por cámara - IoT Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
+    
+    <link rel="icon" type="image/png" href="{{ asset('images/logo-iot.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logo-iot.png') }}">
+<style>
         :root {
             --bg: #07111f;
             --panel: rgba(15, 23, 42, 0.86);
@@ -352,6 +355,25 @@
             box-shadow: 0 18px 44px rgba(127, 29, 29, 0.42);
         }
 
+    
+
+        /* Logo IoT personalizado */
+        .brand-mark,
+        .brand-icon {
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: hidden;
+            padding: 0;
+        }
+        .brand-mark img,
+        .brand-icon img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
     </style>
 </head>
 
@@ -363,7 +385,7 @@
 <div class="page">
     <div class="topbar">
         <div class="brand">
-            <div class="brand-mark">⚠</div>
+            <div class="brand-mark"><img src="{{ asset('images/logo-iot.png') }}" alt="Logo IoT"></div>
             <div>
                 <h1>Alertas por cámara</h1>
                 <p>Reglas operativas por cámara, rango térmico, puerta, señal, batería y destinatarios</p>

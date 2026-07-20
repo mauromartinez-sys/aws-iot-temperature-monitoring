@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <title>Puntos de medición - IoT Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="icon" type="image/png" href="{{ asset('images/logo-iot.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logo-iot.png') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -1012,6 +1015,25 @@
                 height: 280px;
             }
         }
+    
+
+        /* Logo IoT personalizado */
+        .brand-mark,
+        .brand-icon {
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: hidden;
+            padding: 0;
+        }
+        .brand-mark img,
+        .brand-icon img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
     </style>
 </head>
 <body>
@@ -1019,7 +1041,7 @@
 
     <header class="topbar">
         <div class="brand">
-            <div class="brand-mark">IoT</div>
+            <div class="brand-mark"><img src="{{ asset('images/logo-iot.png') }}" alt="Logo IoT"></div>
             <div>
                 <h1>Puntos de medición</h1>
                 <p>Detalle visual e interactivo por cámara frigorífica</p>

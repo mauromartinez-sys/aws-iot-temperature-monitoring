@@ -13,7 +13,27 @@ use Illuminate\Http\Request;
 
 class IotAnalyticsController extends Controller
 {
-    private function getDynamoClient(): DynamoDbClient
+    
+
+    private function appTimezone(): string
+    {
+        return config('app.timezone', 'America/Argentina/Buenos_Aires');
+    }
+
+    private function formatLocalTime(?string $timestamp, string $format = 'H:i'): string
+    {
+        if (!$timestamp) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($timestamp)->timezone($this->appTimezone())->format($format);
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+private function getDynamoClient(): DynamoDbClient
     {
         return new DynamoDbClient([
             'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
@@ -160,7 +180,7 @@ class IotAnalyticsController extends Controller
 
                 $seriesBySensor[$sensorId]['points'][] = [
                     'timestamp' => $row['timestamp'],
-                    'label' => $row['time_label'],
+                    'label' => $this->formatLocalTime($row['timestamp'] ?? null, 'H:i') ?: ($row['time_label'] ?? ''),
                     'temperature' => $row['temperature'],
                     'humidity' => $row['humidity'],
                 ];
@@ -263,7 +283,7 @@ class IotAnalyticsController extends Controller
             }
 
             try {
-                $readingTime = Carbon::parse($row['timestamp'])->timezone(config('app.timezone'));
+                $readingTime = Carbon::parse($row['timestamp'])->timezone($this->appTimezone());
             } catch (\Throwable $e) {
                 return $row;
             }
@@ -273,8 +293,8 @@ class IotAnalyticsController extends Controller
 
             foreach ($candidateEvents as $event) {
                 $eventTime = $event->created_at instanceof Carbon
-                    ? $event->created_at->copy()->timezone(config('app.timezone'))
-                    : Carbon::parse($event->created_at)->timezone(config('app.timezone'));
+                    ? $event->created_at->copy()->timezone($this->appTimezone())
+                    : Carbon::parse($event->created_at)->timezone($this->appTimezone());
 
                 $diff = abs($readingTime->diffInSeconds($eventTime, false));
 
@@ -301,8 +321,8 @@ class IotAnalyticsController extends Controller
             }
 
             $eventTime = $event->created_at instanceof Carbon
-                ? $event->created_at->copy()->timezone(config('app.timezone'))
-                : Carbon::parse($event->created_at)->timezone(config('app.timezone'));
+                ? $event->created_at->copy()->timezone($this->appTimezone())
+                : Carbon::parse($event->created_at)->timezone($this->appTimezone());
 
             if ($eventTime->lt($fromLocal) || $eventTime->gt($toLocal)) {
                 continue;
@@ -348,7 +368,7 @@ class IotAnalyticsController extends Controller
         $row['operation_notes'] = $event->notes;
         $row['operation_user'] = $userName;
         $row['operation_created_at'] = $event->created_at
-            ? $event->created_at->copy()->timezone(config('app.timezone'))->format('d/m/Y H:i:s')
+            ? $event->created_at->copy()->timezone($this->appTimezone())->format('d/m/Y H:i:s')
             : null;
         $row['operation_diff_minutes'] = $diffSeconds !== null ? round($diffSeconds / 60, 1) : null;
         $row['is_operation_only'] = false;
@@ -360,8 +380,8 @@ class IotAnalyticsController extends Controller
     {
         $sensorInfo = $this->sensorInfoForOperationalEvent($event->sensor_key, $sensors);
         $eventTime = $event->created_at
-            ? $event->created_at->copy()->timezone(config('app.timezone'))
-            : now(config('app.timezone'));
+            ? $event->created_at->copy()->timezone($this->appTimezone())
+            : now($this->appTimezone());
 
         $user = $event->user;
         $userName = $user?->name ?? $user?->email ?? 'Usuario no identificado';

@@ -12,7 +12,27 @@ class IotDashboardController extends Controller
 {
 
 
-    private function formatLastActivity(?string $timestamp): array
+    
+
+    private function appTimezone(): string
+    {
+        return config('app.timezone', 'America/Argentina/Buenos_Aires');
+    }
+
+    private function formatLocalTime(?string $timestamp, string $format = 'H:i'): string
+    {
+        if (!$timestamp) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($timestamp)->timezone($this->appTimezone())->format($format);
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+private function formatLastActivity(?string $timestamp): array
     {
         if (!$timestamp) {
             return [
@@ -23,7 +43,7 @@ class IotDashboardController extends Controller
         }
 
         try {
-            $appTimezone = config('app.timezone', 'America/Argentina/Buenos_Aires');
+            $appTimezone = $this->appTimezone();
             $lastSeen = Carbon::parse($timestamp)->timezone($appTimezone);
             $now = now($appTimezone);
             $secondsAgo = max(0, $lastSeen->diffInSeconds($now));
@@ -247,7 +267,7 @@ class IotDashboardController extends Controller
                     'type' => $latest['status'],
                     'message' => $latest['status_message'],
                     'temperature' => $latest['temperature'],
-                    'timestamp' => $latest['timestamp'],
+                    'timestamp' => $this->formatLocalTime($latest['timestamp'] ?? null, 'd/m H:i:s'),
                 ];
             }
 
@@ -258,7 +278,7 @@ class IotDashboardController extends Controller
             $chartData[$sensorId] = [
                 'name' => $latest['camera_id'],
                 'labels' => array_map(function ($i) {
-                    return isset($i['timestamp']) ? substr($i['timestamp'], 11, 5) : '';
+                    return $this->formatLocalTime($i['timestamp'] ?? null, 'H:i');
                 }, $history),
                 'temperatures' => array_map(function ($i) {
                     return isset($i['temperature']) ? (float) $i['temperature'] : null;

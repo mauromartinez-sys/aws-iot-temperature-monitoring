@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <title>IoT Dashboard - Monitoreo de Cámaras</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="icon" type="image/png" href="{{ asset('images/logo-iot.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logo-iot.png') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -662,6 +665,25 @@
             .trend-chart-wrap { height: 300px; min-height: 300px; }
             .side-chart-wrap { height: 220px; min-height: 220px; }
         }
+    
+
+        /* Logo IoT personalizado */
+        .brand-mark,
+        .brand-icon {
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: hidden;
+            padding: 0;
+        }
+        .brand-mark img,
+        .brand-icon img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
     </style>
 </head>
 
@@ -673,7 +695,7 @@
 
     <header class="topbar">
         <div class="brand">
-            <div class="brand-mark">IoT</div>
+            <div class="brand-mark"><img src="{{ asset('images/logo-iot.png') }}" alt="Logo IoT"></div>
             <div>
                 <h1>Monitoreo Inteligente de Cámaras</h1>
                 <p>Temperatura, humedad, puertas, batería y señal en tiempo real</p>
@@ -816,7 +838,6 @@
             <div class="panel-header">
                 <div>
                     <h3 class="panel-title">Tendencia de temperatura</h3>
-                    <p class="panel-subtitle">Comparación de los 3 sensores durante las últimas lecturas</p>
                 </div>
                 <span class="badge success">● Datos en vivo</span>
             </div>

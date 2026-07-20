@@ -13,7 +13,27 @@ class IotPointsController extends Controller
 {
 
 
-    private function formatLastActivity(?string $timestamp): array
+    
+
+    private function appTimezone(): string
+    {
+        return config('app.timezone', 'America/Argentina/Buenos_Aires');
+    }
+
+    private function formatLocalTime(?string $timestamp, string $format = 'H:i'): string
+    {
+        if (!$timestamp) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($timestamp)->timezone($this->appTimezone())->format($format);
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+private function formatLastActivity(?string $timestamp): array
     {
         if (!$timestamp) {
             return [
@@ -24,7 +44,7 @@ class IotPointsController extends Controller
         }
 
         try {
-            $appTimezone = config('app.timezone', 'America/Argentina/Buenos_Aires');
+            $appTimezone = $this->appTimezone();
             $lastSeen = Carbon::parse($timestamp)->timezone($appTimezone);
             $now = now($appTimezone);
             $secondsAgo = max(0, $lastSeen->diffInSeconds($now));
@@ -224,7 +244,7 @@ class IotPointsController extends Controller
         }
 
         try {
-            return Carbon::parse($value)->format('d/m H:i:s');
+            return Carbon::parse($value)->timezone($this->appTimezone())->format('d/m H:i:s');
         } catch (\Throwable $e) {
             return $value;
         }
@@ -595,9 +615,7 @@ class IotPointsController extends Controller
             $historyHumidity = [];
 
             foreach ($historyAsc as $entry) {
-                $historyLabels[] = isset($entry['timestamp'])
-                    ? Carbon::parse($entry['timestamp'])->format('H:i')
-                    : '';
+                $historyLabels[] = $this->formatLocalTime($entry['timestamp'] ?? null, 'H:i');
                 $historyTemperatures[] = isset($entry['temperature']) ? (float) $entry['temperature'] : null;
                 $historyHumidity[] = isset($entry['humidity']) ? (int) $entry['humidity'] : null;
             }
@@ -605,7 +623,7 @@ class IotPointsController extends Controller
             $historyRows = [];
             foreach (array_slice($items, 0, 10) as $entry) {
                 $historyRows[] = [
-                    'timestamp' => isset($entry['timestamp']) ? Carbon::parse($entry['timestamp'])->format('d/m H:i:s') : '—',
+                    'timestamp' => $this->formatLocalTime($entry['timestamp'] ?? null, 'd/m H:i:s') ?: '—',
                     'temperature' => isset($entry['temperature']) ? number_format((float) $entry['temperature'], 1) . '°C' : '—',
                     'humidity' => isset($entry['humidity']) ? (int) $entry['humidity'] . '%' : '—',
                     'door' => !empty($entry['door_open']) ? 'Abierta' : 'Cerrada',
